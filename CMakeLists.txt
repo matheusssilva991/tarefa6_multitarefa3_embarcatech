@@ -36,7 +36,6 @@ add_executable(${PROJECT_NAME}
         lib/led/led.c # LED library
         lib/ssd1306/ssd1306.c # SSD1306 library
         lib/ssd1306/display.c # Display library
-        lib/ws2812b/ws2812b.c # WS2812B library
         lib/buzzer/buzzer.c # Buzzer library)
         )
 
@@ -50,7 +49,6 @@ target_link_libraries(${PROJECT_NAME}
         hardware_i2c
         hardware_adc
         hardware_pwm
-        hardware_pio
         hardware_timer
         hardware_clocks
         FreeRTOS-Kernel
