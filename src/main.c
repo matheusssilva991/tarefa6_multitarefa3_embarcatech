@@ -20,7 +20,7 @@
 ssd1306_t ssd;
 const uint8_t MAX = 8;
 SemaphoreHandle_t xMutex;
-static volatile int current_occupancy = 0;
+static volatile int available_tokens = MAX;
 
 void vTaskEntrance(void *params);
 void vTaskExit(void *params);
@@ -40,7 +40,7 @@ int main()
     // Inicializa o Mutex
     xMutex = xSemaphoreCreateMutex();
 
-    xTaskCreate(vTaskEntrance, "Task de entrada", configMINIMAL_STACK_SIZE + 128, NULL, 2, NULL);
+    xTaskCreate(vTaskEntrance, "Task de entrada", configMINIMAL_STACK_SIZE + 128, NULL, 1, NULL);
     xTaskCreate(vTaskExit, "Task de saída", configMINIMAL_STACK_SIZE + 128, NULL, 1, NULL);
     xTaskCreate(vTaskReset, "Task de reset", configMINIMAL_STACK_SIZE + 128, NULL, 1, NULL);
 
@@ -57,25 +57,43 @@ void gpio_irq_handler(uint gpio, uint32_t events)
 
 void vTaskEntrance(void *params) {
     init_btn(BTN_A_PIN);
+    char buffer[40];
 
     while(true) {
-        printf("Tarefa de entrada.\n");
-        ssd1306_fill(&ssd, false);
-        ssd1306_draw_string(&ssd, "Tarefa de entrada", 5, 20);
-        ssd1306_send_data(&ssd);
+        if (xSemaphoreTake(xMutex, portMAX_DELAY)==pdTRUE) {
+            ssd1306_fill(&ssd, false);
+            draw_centered_text(&ssd, "Fichas RU", 3);
+
+            snprintf(buffer, sizeof(buffer), "Total: %d", MAX);
+            ssd1306_draw_string(&ssd, buffer, 3, 25);
+            snprintf(buffer, sizeof(buffer), "Livres: %d", available_tokens);
+            ssd1306_draw_string(&ssd, buffer, 3, 36);
+
+            ssd1306_send_data(&ssd);
+            xSemaphoreGive(xMutex);
+        }
         vTaskDelay(pdTICKS_TO_MS(3000));
     };
 }
 
 void vTaskExit(void *params) {
     init_btn(BTN_B_PIN);
+    char buffer[40];
 
     while(true) {
-        ssd1306_fill(&ssd, false);
-        ssd1306_draw_string(&ssd, "Tarefa de saída", 5, 20);
-        ssd1306_send_data(&ssd);
-        printf("Tarefa de saída.\n");
-        vTaskDelay(pdTICKS_TO_MS(1500));
+        if (xSemaphoreTake(xMutex, portMAX_DELAY)==pdTRUE) {
+            ssd1306_fill(&ssd, false);
+            draw_centered_text(&ssd, "Fichas RU", 3);
+
+            snprintf(buffer, sizeof(buffer), "Total: %d", MAX);
+            ssd1306_draw_string(&ssd, buffer, 3, 25);
+            snprintf(buffer, sizeof(buffer), "Livres: %d", available_tokens);
+            ssd1306_draw_string(&ssd, buffer, 3, 36);
+
+            ssd1306_send_data(&ssd);
+            xSemaphoreGive(xMutex);
+        }
+        vTaskDelay(pdTICKS_TO_MS(2000));
     };
 }
 
