@@ -39,9 +39,10 @@ int main()
 {
     stdio_init_all();
 
-    // Ativa BOOTSEL via botão SW
+    // Inicializa o display OLED, LEDs e buzzer
     init_display(&ssd);
     init_leds();
+    init_buzzer(BUZZER_A_PIN, 4.0f);
 
     // Inicializa os semáforos
     xOutputMutex = xSemaphoreCreateMutex();
@@ -101,7 +102,24 @@ void vTaskEntrance(void *params) {
                     xSemaphoreGive(xOutputMutex);
                 }
             } else {
-                // Lógica para o caso de não haver fichas disponíveis
+                // Se não há fichas disponíveis, emite um beep
+                if (xSemaphoreTake(xOutputMutex, portMAX_DELAY) == pdTRUE) {
+                    play_tone(BUZZER_A_PIN, 450);
+
+                    ssd1306_fill(&ssd, false);
+                    ssd1306_rect(&ssd, 0, 0, ssd.width, ssd.height, true, false);
+                    draw_centered_text(&ssd, "Fichas RU", 5);
+                    draw_centered_text(&ssd, "Sem fichas!!!", 36);
+                    ssd1306_send_data(&ssd);
+
+                    vTaskDelay(pdTICKS_TO_MS(500));
+                    stop_tone(BUZZER_A_PIN);
+
+                    vTaskDelay(pdTICKS_TO_MS(1500));
+                    update_display();
+
+                    xSemaphoreGive(xOutputMutex);
+                }
             }
         }
 
@@ -151,6 +169,15 @@ void vTaskReset(void *params) {
 
                 update_display();
                 update_ledRGB();
+
+                play_tone(BUZZER_A_PIN, 450);
+                vTaskDelay(pdTICKS_TO_MS(150));
+                stop_tone(BUZZER_A_PIN);
+                vTaskDelay(pdTICKS_TO_MS(150));
+                play_tone(BUZZER_A_PIN, 450);
+                vTaskDelay(pdTICKS_TO_MS(150));
+                stop_tone(BUZZER_A_PIN);
+
                 xSemaphoreGive(xOutputMutex);
             }
         }
