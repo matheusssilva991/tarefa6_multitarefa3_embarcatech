@@ -2,9 +2,6 @@
 
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
-#include "hardware/adc.h"
-#include "hardware/i2c.h"
-#include "hardware/pwm.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -16,8 +13,12 @@
 #include "lib/button/button.h"
 #include "lib/buzzer/buzzer.h"
 
-ssd1306_t ssd;
+// Constantes globais
 const uint8_t MAX = 8;
+const uint32_t DEBOUNCE_MS = 270; // Tempo de debounce em milissegundos
+
+// Variáveis globais
+ssd1306_t ssd;
 SemaphoreHandle_t xOutputMutex;
 SemaphoreHandle_t xCounterSemphr;
 SemaphoreHandle_t xBinBtnSwSemphr;
@@ -67,13 +68,13 @@ void gpio_irq_handler(uint gpio, uint32_t events)
 {
     uint64_t current_time = to_ms_since_boot(get_absolute_time());
 
-    if (gpio == BTN_SW_PIN && current_time - last_time_btn_sw > 270) {
+    if (gpio == BTN_SW_PIN && current_time - last_time_btn_sw > DEBOUNCE_MS) {
         last_time_btn_sw = current_time;
         xSemaphoreGiveFromISR(xBinBtnSwSemphr, NULL);
-    } else if (gpio == BTN_A_PIN && current_time - last_time_btn_a > 270) {
+    } else if (gpio == BTN_A_PIN && current_time - last_time_btn_a > DEBOUNCE_MS) {
         last_time_btn_a = current_time;
         xSemaphoreGiveFromISR(xBinBtnASemphr, NULL);
-    } else if (gpio == BTN_B_PIN && current_time - last_time_btn_b > 270) {
+    } else if (gpio == BTN_B_PIN && current_time - last_time_btn_b > DEBOUNCE_MS) {
         last_time_btn_b = current_time;
         xSemaphoreGiveFromISR(xBinBtnBSemphr, NULL);
     }
