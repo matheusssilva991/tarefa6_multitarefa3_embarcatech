@@ -19,12 +19,11 @@
 
 ssd1306_t ssd;
 const uint8_t MAX = 8;
-SemaphoreHandle_t xMutex;
+SemaphoreHandle_t xOutputMutex;
 SemaphoreHandle_t xCounterSemphr;
-SemaphoreHandle_t xBtnSwSemphr;
-SemaphoreHandle_t xBtnASemphr;
-SemaphoreHandle_t xBtnBSemphr;
-static volatile int avaliable_tokens = MAX;
+SemaphoreHandle_t xBinBtnSwSemphr;
+SemaphoreHandle_t xBinBtnASemphr;
+SemaphoreHandle_t xBinBtnBSemphr;
 static volatile int64_t last_time_btn_a = 0;
 static volatile int64_t last_time_btn_b = 0;
 
@@ -32,6 +31,7 @@ void vTaskEntrance(void *params);
 void vTaskExit(void *params);
 void vTaskReset(void *params);
 void update_display();
+void update_ledRGB();
 void gpio_irq_handler(uint gpio, uint32_t events); // Função de interrupção para o botão B
 
 int main()
@@ -41,15 +41,20 @@ int main()
     // Ativa BOOTSEL via botão SW
     init_btn(BTN_SW_PIN);
     init_display(&ssd);
+    init_leds();
 
     gpio_set_irq_enabled_with_callback(BTN_SW_PIN, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
 
-    // Inicializa o Mutex
-    xMutex = xSemaphoreCreateMutex();
-    xCounterSemphr = xSemaphoreCreateCounting(MAX, avaliable_tokens);
-    xBtnSwSemphr = xSemaphoreCreateBinary();
-    xBtnASemphr = xSemaphoreCreateBinary();
-    xBtnBSemphr = xSemaphoreCreateBinary();
+    // Inicializa os semáforos
+    xOutputMutex = xSemaphoreCreateMutex();
+    xCounterSemphr = xSemaphoreCreateCounting(MAX, MAX);
+    xBinBtnSwSemphr = xSemaphoreCreateBinary();
+    xBinBtnASemphr = xSemaphoreCreateBinary();
+    xBinBtnBSemphr = xSemaphoreCreateBinary();
+
+    // Atualiza o display e o LED RGB
+    update_display();
+    update_ledRGB();
 
     xTaskCreate(vTaskEntrance, "Task de entrada", configMINIMAL_STACK_SIZE + 128, NULL, 1, NULL);
     xTaskCreate(vTaskExit, "Task de saída", configMINIMAL_STACK_SIZE + 128, NULL, 1, NULL);
@@ -70,42 +75,37 @@ void gpio_irq_handler(uint gpio, uint32_t events)
 
     } else if (gpio == BTN_A_PIN && current_time - last_time_btn_a > 270) {
         last_time_btn_a = current_time;
-        xSemaphoreGiveFromISR(xBtnASemphr, NULL);
+        xSemaphoreGiveFromISR(xBinBtnASemphr, NULL);
     } else if (gpio == BTN_B_PIN && current_time - last_time_btn_b > 270) {
         last_time_btn_b = current_time;
-        xSemaphoreGiveFromISR(xBtnBSemphr, NULL);
+        xSemaphoreGiveFromISR(xBinBtnBSemphr, NULL);
     }
 
 
 }
 
+// Tarefa de entrada de fichas do RU
+// Lógica: quando o botão A é pressionado, pega um token de contagem
+// e atualiza o display e o LED RGB
 void vTaskEntrance(void *params) {
     init_btn(BTN_A_PIN);
     gpio_set_irq_enabled_with_callback(BTN_A_PIN, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
 
-    // Garante que o display seja atualizado na inicialização
-    // Aguarda o mutex para atualizar o display
-    if (xSemaphoreTake(xMutex, portMAX_DELAY) == pdTRUE) {
-        update_display();
-        xSemaphoreGive(xMutex);
-    }
+    update_ledRGB();
 
     while(true) {
         // Aguarda o botão A ser pressionado
-        if (xSemaphoreTake(xBtnASemphr, portMAX_DELAY) == pdTRUE) {
+        if (xSemaphoreTake(xBinBtnASemphr, portMAX_DELAY) == pdTRUE) {
             // Aguarda o semáforo de contagem
-            if (xSemaphoreTake(xCounterSemphr, portMAX_DELAY) == pdTRUE) {
-                avaliable_tokens--;
-
-                if (avaliable_tokens < 0) {
-                    avaliable_tokens = 0;
-                }
-
-                // Se o semáforo foi obtido, atualiza o display
-                if (xSemaphoreTake(xMutex, portMAX_DELAY) == pdTRUE) {
+            if (xSemaphoreTake(xCounterSemphr, 0) == pdTRUE) {
+                // Pega um token para indicar que uma ficha foi retirada
+                if (xSemaphoreTake(xOutputMutex, portMAX_DELAY) == pdTRUE) {
                     update_display();
-                    xSemaphoreGive(xMutex);
+                    update_ledRGB();
+                    xSemaphoreGive(xOutputMutex);
                 }
+            } else {
+                // Lógica para o caso de não haver fichas disponíveis
             }
         }
 
@@ -113,25 +113,23 @@ void vTaskEntrance(void *params) {
     };
 }
 
+// Tarefa de saída de fichas do RU
+// Liógica: quando o botão B é pressionado, libera um token de contagem
+// e atualiza o display e o LED RGB
 void vTaskExit(void *params) {
     init_btn(BTN_B_PIN);
     gpio_set_irq_enabled_with_callback(BTN_B_PIN, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
 
     while(true) {
         // Aguarda o botão B ser pressionado
-        if (xSemaphoreTake(xBtnBSemphr, portMAX_DELAY) == pdTRUE) {
+        if (xSemaphoreTake(xBinBtnBSemphr, portMAX_DELAY) == pdTRUE) {
             // Libera um token
             if (xSemaphoreGive(xCounterSemphr) == pdTRUE) {
-                avaliable_tokens++;
-
-                if (avaliable_tokens > MAX) {
-                    avaliable_tokens = MAX;
-                }
-
-                // Se o semáforo foi obtido, atualiza o display
-                if (xSemaphoreTake(xMutex, portMAX_DELAY) == pdTRUE) {
+                // Pega um token para indicar que uma ficha foi devolvida
+                if (xSemaphoreTake(xOutputMutex, portMAX_DELAY) == pdTRUE) {
                     update_display();
-                    xSemaphoreGive(xMutex);
+                    update_ledRGB();
+                    xSemaphoreGive(xOutputMutex);
                 }
             }
         }
@@ -140,14 +138,18 @@ void vTaskExit(void *params) {
     };
 }
 
+// Tarefa de reset do RU
 void vTaskReset(void *params) {
     while(true) {
         vTaskDelay(pdTICKS_TO_MS(1000));
     };
 }
 
+// Atualiza o display com o número de fichas disponíveis
+// e o número total de fichas
 void update_display() {
     char buffer[40];
+    UBaseType_t available_tokens = uxSemaphoreGetCount(xCounterSemphr);
 
     ssd1306_fill(&ssd, false);
     ssd1306_rect(&ssd, 0, 0, ssd.width, ssd.height, true, false);
@@ -155,10 +157,27 @@ void update_display() {
 
     snprintf(buffer, sizeof(buffer), "Total: %d", MAX);
     ssd1306_draw_string(&ssd, buffer, 5, 25);
-    snprintf(buffer, sizeof(buffer), "Livres: %d",  avaliable_tokens);
+    snprintf(buffer, sizeof(buffer), "Livres: %d",  available_tokens);
     ssd1306_draw_string(&ssd, buffer, 5, 36);
-    snprintf(buffer, sizeof(buffer), "Usadas: %d", MAX - avaliable_tokens);
+    snprintf(buffer, sizeof(buffer), "Usadas: %d", MAX - available_tokens);
     ssd1306_draw_string(&ssd, buffer, 5, 47);
 
     ssd1306_send_data(&ssd);
+}
+
+// Atualiza o LED RGB de acordo com o número de fichas disponíveis
+// Se todas as fichas estão disponíveis, o LED fica azul
+// Se não há fichas disponíveis, o LED fica vermelho
+// Se há uma ficha disponível, o LED fica amarelo
+void update_ledRGB() {
+    UBaseType_t available_tokens = uxSemaphoreGetCount(xCounterSemphr);
+    if (available_tokens == MAX) {
+        set_led_blue();
+    } else if (available_tokens == 0) {
+        set_led_red();
+    } else if (available_tokens == 1) {
+        set_led_yellow();
+    } else {
+        set_led_green();
+    }
 }
