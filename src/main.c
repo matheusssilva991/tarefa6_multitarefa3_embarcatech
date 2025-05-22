@@ -5,7 +5,6 @@
 #include "hardware/adc.h"
 #include "hardware/i2c.h"
 #include "hardware/pwm.h"
-#include "pico/bootrom.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -26,6 +25,7 @@ SemaphoreHandle_t xBinBtnASemphr;
 SemaphoreHandle_t xBinBtnBSemphr;
 static volatile int64_t last_time_btn_a = 0;
 static volatile int64_t last_time_btn_b = 0;
+static volatile int64_t last_time_btn_sw = 0;
 
 void vTaskEntrance(void *params);
 void vTaskExit(void *params);
@@ -39,11 +39,8 @@ int main()
     stdio_init_all();
 
     // Ativa BOOTSEL via botão SW
-    init_btn(BTN_SW_PIN);
     init_display(&ssd);
     init_leds();
-
-    gpio_set_irq_enabled_with_callback(BTN_SW_PIN, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
 
     // Inicializa os semáforos
     xOutputMutex = xSemaphoreCreateMutex();
@@ -58,21 +55,21 @@ int main()
 
     xTaskCreate(vTaskEntrance, "Task de entrada", configMINIMAL_STACK_SIZE + 128, NULL, 1, NULL);
     xTaskCreate(vTaskExit, "Task de saída", configMINIMAL_STACK_SIZE + 128, NULL, 1, NULL);
-    //xTaskCreate(vTaskReset, "Task de reset", configMINIMAL_STACK_SIZE + 128, NULL, 1, NULL);
+    xTaskCreate(vTaskReset, "Task de reset", configMINIMAL_STACK_SIZE + 128, NULL, 1, NULL);
 
     // Inicia o agendador
     vTaskStartScheduler();
     panic_unsupported();
 }
 
-// Função de interrupção para o botão SW
+// Função de interrupção para os botões
 void gpio_irq_handler(uint gpio, uint32_t events)
 {
     uint64_t current_time = to_ms_since_boot(get_absolute_time());
 
-    if (gpio == BTN_SW_PIN) {
-        reset_usb_boot(0, 0);
-
+    if (gpio == BTN_SW_PIN && current_time - last_time_btn_sw > 270) {
+        last_time_btn_sw = current_time;
+        xSemaphoreGiveFromISR(xBinBtnSwSemphr, NULL);
     } else if (gpio == BTN_A_PIN && current_time - last_time_btn_a > 270) {
         last_time_btn_a = current_time;
         xSemaphoreGiveFromISR(xBinBtnASemphr, NULL);
@@ -80,8 +77,6 @@ void gpio_irq_handler(uint gpio, uint32_t events)
         last_time_btn_b = current_time;
         xSemaphoreGiveFromISR(xBinBtnBSemphr, NULL);
     }
-
-
 }
 
 // Tarefa de entrada de fichas do RU
@@ -114,7 +109,7 @@ void vTaskEntrance(void *params) {
 }
 
 // Tarefa de saída de fichas do RU
-// Liógica: quando o botão B é pressionado, libera um token de contagem
+// Lógica: quando o botão B é pressionado, libera um token de contagem
 // e atualiza o display e o LED RGB
 void vTaskExit(void *params) {
     init_btn(BTN_B_PIN);
@@ -140,7 +135,25 @@ void vTaskExit(void *params) {
 
 // Tarefa de reset do RU
 void vTaskReset(void *params) {
+    init_btn(BTN_SW_PIN);
+    gpio_set_irq_enabled_with_callback(BTN_SW_PIN, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
+
     while(true) {
+        if (xSemaphoreTake(xBinBtnSwSemphr, portMAX_DELAY) == pdTRUE) {
+            // Reseta o contador de fichas
+            if (xSemaphoreTake(xOutputMutex, portMAX_DELAY) == pdTRUE) {
+                // Libera todos os tokens
+                // para indicar que todas as fichas foram devolvidas
+                while (uxSemaphoreGetCount(xCounterSemphr) < MAX) {
+                    xSemaphoreGive(xCounterSemphr);
+                }
+
+                update_display();
+                update_ledRGB();
+                xSemaphoreGive(xOutputMutex);
+            }
+        }
+
         vTaskDelay(pdTICKS_TO_MS(1000));
     };
 }
