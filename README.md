@@ -1,28 +1,23 @@
-# **Estação de Alerta de Enchente com Simulação por Joystick**
+# **RU Token Manager – Gerenciador de Fichas do Restaurante Universitário**
 
 ## **Descrição**
 
-Este projeto é uma estação embarcada para monitoramento de cheias e inundações, utilizando sensores analógicos (simulados por joystick), display OLED, matriz de LEDs, buzzer e LED RGB. O sistema monitora em tempo real o nível da água e o volume de chuva, sinalizando automaticamente situações de alerta por meio de interface visual e sonora.
+Este projeto é um sistema embarcado para gerenciamento de fichas de restaurante universitário (RU), utilizando Raspberry Pi Pico, FreeRTOS, display OLED, botões, LED RGB e buzzer. O sistema controla a quantidade de fichas disponíveis, permitindo retirada, devolução e reset, com feedback visual e sonoro.
 
 ---
 
 ## **Funcionalidades**
 
-- **Monitoramento Ambiental:**
-  - Leitura contínua do nível da água e do volume de chuva (via joystick analógico).
-  - Cálculo e exibição dos valores em porcentagem no display OLED.
-- **Alerta Automático:**
-  - Modo alerta ativado automaticamente quando o nível da água ≥ 70% ou o volume de chuva ≥ 80%.
-  - LED RGB indica o status (verde para normal, vermelho para alerta).
-  - Buzzer emite sinais sonoros distintos para cada tipo de alerta.
-  - Matriz de LEDs pode exibir ícone ou símbolo de perigo em modo alerta.
-  - Display OLED destaca o status de alerta.
-- **Interface Física:**
-  - Botão para funções de controle/reset.
-  - Display OLED SSD1306 (128x64 pixels).
-  - Matriz de LEDs WS2812B.
-  - Buzzer para sinalização sonora.
-  - LED RGB para indicação visual.
+- **Gerenciamento de Fichas:**
+  - Controle do número de fichas disponíveis via semáforo de contagem.
+  - Retirada (entrada) e devolução (saída) de fichas por botões físicos.
+  - Reset rápido para restaurar todas as fichas.
+- **Interface Visual e Sonora:**
+  - Display OLED mostra total, livres e usadas.
+  - LED RGB indica o status das fichas (azul: todas livres, vermelho: nenhuma livre, amarelo: uma livre, verde: parcial).
+  - Buzzer emite sons em caso de erro (sem fichas) ou reset.
+- **Debounce por Software:**
+  - Implementado para evitar múltiplos acionamentos por ruído nos botões.
 
 ---
 
@@ -30,25 +25,22 @@ Este projeto é uma estação embarcada para monitoramento de cheias e inundaç�
 
 ### **Hardware**
 
-- Microcontrolador Raspberry Pi Pico W.
-- Display OLED SSD1306 (128x64 pixels).
-- Matriz de LEDs WS2812B.
-- Buzzer.
-- LED RGB (ou LEDs individuais).
-- Joystick analógico (ou dois potenciômetros para simular sensores).
-- Botão para controle/reset.
-- Fonte de alimentação compatível.
+- Raspberry Pi Pico
+- Display OLED SSD1306 (128x64 pixels, I2C)
+- 3 botões (entrada, saída, reset)
+- LED RGB
+- Buzzer
+- Resistores e jumpers
 
 ### **Software**
 
-- **SDK do Raspberry Pi Pico.**
-- **FreeRTOS** para gerenciamento de tarefas.
+- **SDK do Raspberry Pi Pico**
+- **FreeRTOS** para multitarefa
 - **Bibliotecas adicionais:**
-  - `ssd1306` para controle do display OLED.
-  - `ws2812b` para controle da matriz de LEDs.
-  - `button` para leitura de botões.
-  - `buzzer` para controle do buzzer.
-  - `led` para controle do LED RGB.
+  - `ssd1306` para display OLED
+  - `button` para leitura dos botões
+  - `buzzer` para controle do buzzer
+  - `led` para controle do LED RGB
 
 ---
 
@@ -57,8 +49,8 @@ Este projeto é uma estação embarcada para monitoramento de cheias e inundaç�
 1. **Clone o repositório:**
 
    ```bash
-   git clone https://github.com/matheusssilva991/tarefa5_multitarefa2_embarcatech.git
-   cd estacao-monitoramento-cheias
+   git clone https://github.com/matheusssilva991/tarefa6_multitarefa3_embarcatech.git
+   cd ru-token-manager
    ```
 
 2. **Configure o caminho do FreeRTOS:**
@@ -69,10 +61,8 @@ Este projeto é uma estação embarcada para monitoramento de cheias e inundaç�
    ```
 
    - Certifique-se de que o FreeRTOS esteja corretamente instalado e acessível.
-   - O caminho padrão é `~/pico/FreeRTOS`.
-   - Caso tenha instalado o FreeRTOS em outro local, ajuste o caminho conforme necessário.
 
-3. **Compile e envie o código para o Raspberry Pi Pico W:**
+3. **Compile e envie o código para o Raspberry Pi Pico:**
 
    ```bash
    mkdir build
@@ -81,15 +71,14 @@ Este projeto é uma estação embarcada para monitoramento de cheias e inundaç�
    ninja
    ```
 
-4. **Conecte o hardware e alimente o Raspberry Pi Pico W.**
+4. **Conecte o hardware e alimente o Raspberry Pi Pico.**
    - O sistema iniciará automaticamente e exibirá os dados no display OLED.
 
 ---
 
 ## **Demonstração**
 
-Confira o vídeo de demonstração do projeto no YouTube:
-[![Demonstração da Estação de Monitoramento de Cheias]](https://drive.google.com/file/d/18Y9qw2nJHHx6MuAKeCkl1dMBZXa8QG9K/view?usp=sharing)
+*Adicione aqui um link ou vídeo de demonstração do projeto, se desejar.*
 
 ---
 
