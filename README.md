@@ -1,4 +1,4 @@
-# **RU Token Manager – Gerenciador de Fichas do Restaurante Universitário**
+# **Sistema de gerenciamento de ficha de RU**
 
 ## **Descrição**
 
@@ -78,7 +78,7 @@ Este projeto é um sistema embarcado para gerenciamento de fichas de restaurante
 
 ## **Demonstração**
 
-*Adicione aqui um link ou vídeo de demonstração do projeto, se desejar.*
+▶️ [Assista ao vídeo de demonstração no Google Drive](https://drive.google.com/file/d/1UNcEwTQXoDbNuP66fNSVNQDA4XNAGawN/view?usp=drive_link)
 
 ---
 
